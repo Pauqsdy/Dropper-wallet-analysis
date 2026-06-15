@@ -203,7 +203,6 @@ def winsorize_with_bounds(
 
 
 def build_base_frame(registry: pd.DataFrame, kaggle_path: Path) -> pd.DataFrame:
-    """Merge Kaggle + производные признаки без импутации и винзоризации."""
     kaggle_features = load_kaggle_features(kaggle_path)
     merged = registry.merge(kaggle_features, on="address", how="left")
     return create_derived_features(merged)
@@ -213,7 +212,6 @@ def fit_preprocess_state(
     train_df: pd.DataFrame,
     group_col: str = "label",
 ) -> dict:
-    """Статистики предобработки только по train (без утечки из test)."""
     after_pass1 = _apply_imputation_stats(
         train_df, _imputation_stats(train_df, group_col), group_col
     )
@@ -229,7 +227,6 @@ def fit_preprocess_state(
 
 
 def apply_preprocess_state(df: pd.DataFrame, state: dict) -> pd.DataFrame:
-    """Применить к train/test статистики, посчитанные на train."""
     group_col = state.get("group_col", "label")
     after_pass1 = _apply_imputation_stats(df, state["pass1"], group_col)
     after_pass2 = _apply_imputation_stats(after_pass1, state["pass2"], group_col)
@@ -244,7 +241,6 @@ def prepare_modeling_split(
     test_size: float = 0.2,
     random_state: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Разбиение до предобработки; импутация и винзоризация — только по train."""
     from sklearn.model_selection import train_test_split
 
     base = build_base_frame(registry, kaggle_path)

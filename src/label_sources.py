@@ -20,7 +20,6 @@ def _download_text(url: str, timeout: int = 120) -> str:
 
 
 def fetch_kaggle_fraud_dataset(save_path: Path | None = None) -> pd.DataFrame:
-    """Kaggle Ethereum Fraud Detection (локальный CSV или зеркало на GitHub)."""
     if save_path and save_path.exists():
         df = pd.read_csv(save_path)
     else:
@@ -54,7 +53,6 @@ def build_wallet_registry(
     raw_dir: Path,
     sample_kaggle: int | None = 1000,
 ) -> pd.DataFrame:
-    """Реестр: стратифицированная подвыборка Kaggle."""
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     kaggle_df = fetch_kaggle_fraud_dataset(raw_dir / "kaggle_transaction_dataset.csv")
