@@ -6,8 +6,6 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from src.api_clients import NO_PROXIES
-
 KAGGLE_MIRROR_URL = (
     "https://raw.githubusercontent.com/Lemoninmountain/"
     "Enhancing-Fraud-Detection-in-the-Ethereum-Blockchain-"
@@ -15,54 +13,22 @@ KAGGLE_MIRROR_URL = (
     "transaction_dataset.csv"
 )
 
-CONTROL_WALLETS = [
-    {
-        "address": "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
-        "label": "legitimate",
-        "category": "public_figure",
-        "entity": "Vitalik Buterin",
-        "source": "public",
-    },
-    {
-        "address": "0x28C6c06298d514Db089934071355E03B1219d626",
-        "label": "legitimate",
-        "category": "exchange",
-        "entity": "Binance Hot Wallet",
-        "source": "public",
-    },
-    {
-        "address": "0x71660c4005ba85c37ccec55d0c4494e57966cfe8",
-        "label": "legitimate",
-        "category": "exchange",
-        "entity": "Coinbase",
-        "source": "public",
-    },
-    {
-        "address": "0x3f5CE5FBFe3E9af3971dD833D26bA9b5C936f0bE",
-        "label": "legitimate",
-        "category": "exchange",
-        "entity": "Binance",
-        "source": "public",
-    },
-    {
-        "address": "0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503",
-        "label": "legitimate",
-        "category": "bridge",
-        "entity": "Binance Peg",
-        "source": "public",
-    },
-]
-
 def _download_text(url: str, timeout: int = 120) -> str:
-    response = requests.get(url, proxies=NO_PROXIES, timeout=timeout)
+    response = requests.get(url, timeout=timeout)
     response.raise_for_status()
     return response.text
 
 
 def fetch_kaggle_fraud_dataset(save_path: Path | None = None) -> pd.DataFrame:
-    """Kaggle Ethereum Fraud Detection (зеркало на GitHub)"""
-    csv_text = _download_text(KAGGLE_MIRROR_URL)
-    df = pd.read_csv(io.StringIO(csv_text))
+    """Kaggle Ethereum Fraud Detection (локальный CSV или зеркало на GitHub)."""
+    if save_path and save_path.exists():
+        df = pd.read_csv(save_path)
+    else:
+        csv_text = _download_text(KAGGLE_MIRROR_URL)
+        df = pd.read_csv(io.StringIO(csv_text))
+        if save_path:
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(save_path, index=False)
 
     if "Address" not in df.columns:
         raise ValueError("Не найдена колонка Address в датасете Kaggle.")
@@ -81,27 +47,14 @@ def fetch_kaggle_fraud_dataset(save_path: Path | None = None) -> pd.DataFrame:
         columns=["Address", "FLAG"], errors="ignore"
     ).to_dict(orient="records")
 
-    if save_path:
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_path, index=False)
-
     return result
-
-
-def get_control_wallets_df() -> pd.DataFrame:
-    """Контрольные легитимные кошельки (ETH/TRON) для демонстрации API."""
-    rows = []
-    for wallet in CONTROL_WALLETS:
-        rows.append({**wallet, "raw_features": None, "chain": "ETH"})
-    return pd.DataFrame(rows)
 
 
 def build_wallet_registry(
     raw_dir: Path,
     sample_kaggle: int | None = 1000,
-    include_controls: bool = True,
 ) -> pd.DataFrame:
-    """Реестр: стратифицированная выборка Kaggle + контрольные адреса бирж."""
+    """Реестр: стратифицированная подвыборка Kaggle."""
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     kaggle_df = fetch_kaggle_fraud_dataset(raw_dir / "kaggle_transaction_dataset.csv")
@@ -114,11 +67,7 @@ def build_wallet_registry(
         ]
         kaggle_df = pd.concat(sampled_parts, ignore_index=True)
 
-    parts = [kaggle_df]
-    if include_controls:
-        parts.append(get_control_wallets_df())
-
-    registry = pd.concat(parts, ignore_index=True)
+    registry = kaggle_df.copy()
 
     eth_mask = registry["chain"] == "ETH"
     registry.loc[eth_mask, "address"] = registry.loc[eth_mask, "address"].str.lower()
